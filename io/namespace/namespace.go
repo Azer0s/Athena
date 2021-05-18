@@ -19,6 +19,8 @@ type Namespace struct {
 	shards    []*shard.Shard
 	idIdx     map[string]*shard.Shard
 	metaShard *shard.Shard
+
+	writeQueue []*shard.Document
 }
 
 func (n *Namespace) init() error {

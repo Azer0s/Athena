@@ -273,7 +273,7 @@ func (s *Shard) Delete(id string) error {
 
 func (s *Shard) Documents() []string {
 	ids := make([]string, 0)
-	for k, _ := range s.idIdx {
+	for k := range s.idIdx {
 		ids = append(ids, k)
 	}
 

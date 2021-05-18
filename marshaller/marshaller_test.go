@@ -106,7 +106,7 @@ func TestMarshalInt2(t *testing.T) {
 func TestMarshalStringSlice(t *testing.T) {
 	buff := &bytes.Buffer{}
 
-	val := []string{"foo", "bar", "hello", "world"}
+	val := []interface{}{"foo", "bar", "hello", "world"}
 
 	err := Marshal(val, buff)
 	if err != nil {
@@ -124,7 +124,76 @@ func TestMarshalStringSlice(t *testing.T) {
 func TestMarshalStringSlice2(t *testing.T) {
 	buff := &bytes.Buffer{}
 
-	val := []string{}
+	val := []interface{}{}
+
+	err := Marshal(val, buff)
+	if err != nil {
+		return
+	}
+
+	unmarshal, err := Unmarshal(buff.Bytes())
+	if err != nil {
+		return
+	}
+
+	assert.Equal(t, val, unmarshal)
+}
+
+func TestMarshalMap(t *testing.T) {
+	buff := &bytes.Buffer{}
+
+	val := map[interface{}]interface{}{
+		"foo":  "bar",
+		"x":    "y",
+		"test": 16.0,
+		"b":    true,
+	}
+
+	err := Marshal(val, buff)
+	if err != nil {
+		return
+	}
+
+	unmarshal, err := Unmarshal(buff.Bytes())
+	if err != nil {
+		return
+	}
+
+	assert.Equal(t, val, unmarshal)
+}
+
+func TestMarshalMap2(t *testing.T) {
+	buff := &bytes.Buffer{}
+
+	val := map[interface{}]interface{}{}
+
+	err := Marshal(val, buff)
+	if err != nil {
+		return
+	}
+
+	unmarshal, err := Unmarshal(buff.Bytes())
+	if err != nil {
+		return
+	}
+
+	assert.Equal(t, val, unmarshal)
+}
+
+func TestMarshalMap3(t *testing.T) {
+	buff := &bytes.Buffer{}
+
+	val := map[interface{}]interface{}{
+		"foo": "bar",
+		"x":   "y",
+		"test": map[interface{}]interface{}{
+			"foo":  "bar",
+			"x":    "y",
+			"test": 16.0,
+			"b":    float32(10.382374),
+		},
+		"b": true,
+	}
 
 	err := Marshal(val, buff)
 	if err != nil {
