@@ -2,8 +2,10 @@ package namespace
 
 import (
 	"github.com/Azer0s/athena/io/shard"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type Config struct {
@@ -20,11 +22,69 @@ type Namespace struct {
 	idIdx     map[string]*shard.Shard
 	metaShard *shard.Shard
 
-	writeQueue []*shard.Document
+	closingMu *sync.RWMutex
+	closing   bool
+
+	closeWriter  bool
+	writeQueueMu *sync.Mutex
+	writeQueue   []*shard.Document
+
+	openOps *sync.WaitGroup
+}
+
+func (n *Namespace) readLoop() {
+	var doc *shard.Document
+
+	for len(n.writeQueue) == 0 {
+		//chill out for a while
+	}
+
+	n.writeQueueMu.Lock()
+	l := len(n.writeQueue)
+	doc, n.writeQueue = n.writeQueue[0], n.writeQueue[1:l]
+	n.writeQueueMu.Unlock()
+
+	var shardToWrite *shard.Shard = nil
+
+	for _, s := range n.shards {
+		if s.Size() <= n.shardSize {
+			shardToWrite = s
+			break
+		}
+	}
+
+	if shardToWrite == nil {
+		var err error
+		shardToWrite, err = n.createShard()
+
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	err := shardToWrite.Write(doc.Id, doc.Values)
+	if err != nil {
+		panic(err)
+	}
+
+	n.openOps.Done()
+}
+
+func (n *Namespace) setupWriter() {
+	go func() {
+		for !n.closeWriter {
+			n.readLoop()
+		}
+	}()
 }
 
 func (n *Namespace) init() error {
-	n.path = filepath.Join(n.path, n.name)
+	n.openOps = &sync.WaitGroup{}
+
+	n.closingMu = &sync.RWMutex{}
+	n.writeQueueMu = &sync.Mutex{}
+
+	n.path = filepath.Join(n.basePath, n.name)
 	_, err := os.Open(n.path)
 
 	if os.IsNotExist(err) {
@@ -41,28 +101,48 @@ func (n *Namespace) init() error {
 		return err
 	}
 
-	document, err := n.metaShard.Read("shards")
+	shardDocument, err := n.metaShard.Read("shards")
 	if err != nil {
-		err := n.metaShard.Write("shard", map[string]interface{}{
+		err := n.metaShard.Write("shards", map[string]interface{}{
 			"value": []string{},
 		})
 		if err != nil {
 			return err
 		}
 
-		document, err = n.metaShard.Read("shards")
+		err = n.metaShard.Write("max_shardsize", map[string]interface{}{
+			"value": n.shardSize,
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = n.createShard()
+		if err != nil {
+			return err
+		}
+
+		shardDocument, err = n.metaShard.Read("shards")
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, s := range document.Get("shards").([]string) {
-		shrd, err := shard.New(s)
+	shardSizeDocument, err := n.metaShard.Read("max_shardsize")
+	if err != nil {
+		return err
+	}
+	n.shardSize = shardSizeDocument.Get("value").(int)
+
+	shards := shardDocument.Get("value").([]interface{})
+
+	for _, s := range shards {
+		openedShard, err := shard.New(filepath.Join(n.path, s.(string)))
 		if err != nil {
 			return err
 		}
 
-		n.shards = append(n.shards, shrd)
+		n.shards = append(n.shards, openedShard)
 	}
 
 	n.idIdx = make(map[string]*shard.Shard)
@@ -73,13 +153,39 @@ func (n *Namespace) init() error {
 		}
 	}
 
+	n.setupWriter()
+
 	return nil
 }
 
-func (n *Namespace) Name() string {
-	return n.name
-}
+func (n *Namespace) createShard() (*shard.Shard, error) {
+	name := uuid.NewString() + ".ath"
+	s, err := shard.New(filepath.Join(n.path, name))
+	if err != nil {
+		return nil, err
+	}
 
-func (n *Namespace) ShardSize() int {
-	return n.shardSize
+	n.shards = append(n.shards, s)
+
+	document, err := n.metaShard.Read("shards")
+	if err != nil {
+		panic(err)
+	}
+
+	shards := document.Get("value").([]interface{})
+	shards = append(shards, name)
+
+	err = n.metaShard.Delete("shards")
+	if err != nil {
+		panic(err)
+	}
+
+	err = n.metaShard.Write("shards", map[string]interface{}{
+		"value": shards,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return s, nil
 }

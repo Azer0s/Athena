@@ -280,3 +280,12 @@ func (s *Shard) Documents() []string {
 
 	return ids
 }
+
+func (s *Shard) Size() int {
+	stat, err := s.handle.Stat()
+	if err != nil {
+		return 0
+	}
+
+	return int(stat.Size())
+}

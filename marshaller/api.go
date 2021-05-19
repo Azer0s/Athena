@@ -131,10 +131,10 @@ func unmarshalSlice(valBytes []byte) ([]interface{}, error) {
 		return nil, err
 	}
 
-	res := make([]interface{}, 0)
+	res := []interface{}{}
 
 	for i := uint16(0); i < readLen; i++ {
-		typeBytes, err := util.ReadBytesLen(buff)
+		typeBytes, err := util.ReadType(buff)
 		if err != nil {
 			return nil, err
 		}
@@ -166,7 +166,7 @@ func unmarshalMap(valBytes []byte) (map[interface{}]interface{}, error) {
 	res := make(map[interface{}]interface{})
 
 	for i := uint16(0); i < readLen; i++ {
-		typeBytes, err := util.ReadBytesLen(buff)
+		typeBytes, err := util.ReadType(buff)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +181,7 @@ func unmarshalMap(valBytes []byte) (map[interface{}]interface{}, error) {
 			return nil, err
 		}
 
-		typeBytes, err = util.ReadBytesLen(buff)
+		typeBytes, err = util.ReadType(buff)
 		if err != nil {
 			return nil, err
 		}

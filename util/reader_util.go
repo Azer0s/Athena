@@ -20,6 +20,16 @@ func ReadBytesLen(f io.Reader) ([]byte, error) {
 	return valBytes, nil
 }
 
+func ReadType(f io.Reader) ([]byte, error) {
+	typeBytes := make([]byte, 2)
+	_, err := f.Read(typeBytes)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return typeBytes, nil
+}
+
 func ReadLen(f io.Reader) (uint16, error) {
 	valLenBytes := make([]byte, 2)
 	_, err := f.Read(valLenBytes)
