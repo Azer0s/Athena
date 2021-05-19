@@ -23,6 +23,10 @@ func (b boolMarshaller) Bytes(i interface{}) ([]byte, error) {
 	return []byte{0x0}, nil
 }
 
-func (b boolMarshaller) Type() reflect.Type {
+func (b boolMarshaller) Type() uint16 {
+	return TypeIdBool
+}
+
+func (b boolMarshaller) ReflectType() reflect.Type {
 	return reflect.TypeOf(true)
 }

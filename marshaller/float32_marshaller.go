@@ -30,6 +30,10 @@ func (f float32Marshaller) Bytes(i interface{}) ([]byte, error) {
 	return buf[:], nil
 }
 
-func (f float32Marshaller) Type() reflect.Type {
+func (f float32Marshaller) Type() uint16 {
+	return TypeIdFloat32
+}
+
+func (f float32Marshaller) ReflectType() reflect.Type {
 	return reflect.TypeOf(float32(0))
 }

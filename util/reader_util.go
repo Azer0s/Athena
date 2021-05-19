@@ -20,13 +20,13 @@ func ReadBytesLen(f io.Reader) ([]byte, error) {
 	return valBytes, nil
 }
 
-func ReadLen(f io.Reader) (uint32, error) {
-	valLenBytes := make([]byte, 4)
+func ReadLen(f io.Reader) (uint16, error) {
+	valLenBytes := make([]byte, 2)
 	_, err := f.Read(valLenBytes)
 	if err != nil {
 		return 0, err
 	}
 
-	valLen := binary.BigEndian.Uint32(valLenBytes)
+	valLen := binary.BigEndian.Uint16(valLenBytes)
 	return valLen, nil
 }

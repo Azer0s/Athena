@@ -142,7 +142,7 @@ func (s *Shard) Write(id string, values map[string]interface{}) error {
 	info := &DocumentInfo{
 		Start: start,
 		Pos:   offset,
-		Len:   uint32(valBuff.Len()),
+		Len:   uint16(valBuff.Len()),
 	}
 
 	s.idIdx[id] = info
@@ -198,7 +198,8 @@ func (s *Shard) Read(id string) (*Document, error) {
 			return nil, err
 		}
 
-		typeBytes, err := util.ReadBytesLen(buff)
+		typeBytes := make([]byte, 2)
+		_, err = buff.Read(typeBytes)
 		if err != nil {
 			return nil, err
 		}

@@ -25,6 +25,10 @@ func (i intMarshaller) Bytes(v interface{}) ([]byte, error) {
 	return bytes, nil
 }
 
-func (i intMarshaller) Type() reflect.Type {
+func (i intMarshaller) Type() uint16 {
+	return TypeIdInt
+}
+
+func (i intMarshaller) ReflectType() reflect.Type {
 	return reflect.TypeOf(0)
 }

@@ -31,7 +31,10 @@ func TestNewShard(t *testing.T) {
 
 	assert.Equal(t, res.Values, val)
 
-	os.Remove("foo")
+	err = os.Remove("foo")
+	if err != nil {
+		return
+	}
 }
 
 func TestNewShardDelete(t *testing.T) {
@@ -100,5 +103,31 @@ func TestNewShardDelete(t *testing.T) {
 	}
 	assert.Equal(t, res.Values, val)
 
-	os.Remove("foo")
+	err = os.Remove("foo")
+	if err != nil {
+		return
+	}
+}
+
+func BenchmarkCreateDocuments(b *testing.B) {
+	s, _ := shard.New("bench")
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err := s.Write(uuid.NewString(), shard.Values{
+			"foo":  "bar",
+			"x":    "y",
+			"test": 16.0,
+			"b":    true,
+		})
+		if err != nil {
+			return
+		}
+	}
+	b.StopTimer()
+
+	err := os.Remove("bench")
+	if err != nil {
+		return
+	}
 }

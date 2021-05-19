@@ -10,10 +10,12 @@ import (
 type AthenaMarshaller interface {
 	Value([]byte) (interface{}, error)
 	Bytes(interface{}) ([]byte, error)
-	Type() reflect.Type
+	Type() uint16
+	ReflectType() reflect.Type
 }
 
-var marshallerMap = make(map[string]AthenaMarshaller)
+var marshallerMap = make(map[uint16]AthenaMarshaller)
+var marshallerMapStrings = make(map[string]AthenaMarshaller)
 
 func typeToString(p reflect.Type) string {
 	if p.PkgPath() == "" {
@@ -33,17 +35,18 @@ func reflectValueToInterface(v reflect.Value) interface{} {
 }
 
 func Register(marshaller AthenaMarshaller) {
-	marshallerMap[typeToString(marshaller.Type())] = marshaller
+	marshallerMap[marshaller.Type()] = marshaller
+	marshallerMapStrings[typeToString(marshaller.ReflectType())] = marshaller
 }
 
 func marshalSlice(val reflect.Value, buff *bytes.Buffer) error {
-	util.StrToLenBytes("athena/[]", buff)
+	buff.Write(TypeIdSlice)
 
 	valBuff := &bytes.Buffer{}
 
-	//write the length of the string as 4 bytes
-	lenBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBytes, uint32(val.Len()))
+	//write the length of the slice as 2 bytes
+	lenBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(lenBytes, uint16(val.Len()))
 	valBuff.Write(lenBytes)
 
 	for i := 0; i < val.Len(); i++ {
@@ -59,15 +62,15 @@ func marshalSlice(val reflect.Value, buff *bytes.Buffer) error {
 }
 
 func marshalMap(val reflect.Value, buff *bytes.Buffer) error {
-	util.StrToLenBytes("athena/{}", buff)
+	buff.Write(TypeIdMap)
 
 	valBuff := &bytes.Buffer{}
 
 	keys := val.MapKeys()
 
-	//write the length of the string as 4 bytes
-	lenBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBytes, uint32(len(keys)))
+	//write the length of the map as 2 bytes
+	lenBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(lenBytes, uint16(len(keys)))
 	valBuff.Write(lenBytes)
 
 	for _, key := range keys {
@@ -104,9 +107,13 @@ func Marshal(value interface{}, buff *bytes.Buffer) error {
 
 	default:
 		t := typeToString(reflect.TypeOf(value))
-		util.StrToLenBytes(t, buff)
+		marshaller := marshallerMapStrings[t]
 
-		b, err := marshallerMap[t].Bytes(value)
+		typeBytes := make([]byte, 2)
+		binary.BigEndian.PutUint16(typeBytes, marshaller.Type())
+		buff.Write(typeBytes)
+
+		b, err := marshaller.Bytes(value)
 		if err != nil {
 			return err
 		}
@@ -126,7 +133,7 @@ func unmarshalSlice(valBytes []byte) ([]interface{}, error) {
 
 	res := make([]interface{}, 0)
 
-	for i := uint32(0); i < readLen; i++ {
+	for i := uint16(0); i < readLen; i++ {
 		typeBytes, err := util.ReadBytesLen(buff)
 		if err != nil {
 			return nil, err
@@ -158,7 +165,7 @@ func unmarshalMap(valBytes []byte) (map[interface{}]interface{}, error) {
 
 	res := make(map[interface{}]interface{})
 
-	for i := uint32(0); i < readLen; i++ {
+	for i := uint16(0); i < readLen; i++ {
 		typeBytes, err := util.ReadBytesLen(buff)
 		if err != nil {
 			return nil, err
@@ -196,23 +203,19 @@ func unmarshalMap(valBytes []byte) (map[interface{}]interface{}, error) {
 }
 
 func Unmarshal(b []byte) (interface{}, error) {
-	tLen := binary.BigEndian.Uint32(b[:4])
-	t := b[4 : 4+tLen]
-
-	valLen := binary.BigEndian.Uint32(b[4+tLen : 8+tLen])
-
-	val := b[8+tLen : 8+tLen+valLen]
-
-	return UnmarshalWithoutLen(t, val)
+	val := b[4:]
+	return UnmarshalWithoutLen(b[:2], val)
 }
 
 func UnmarshalWithoutLen(typeBytes []byte, valBytes []byte) (interface{}, error) {
-	switch string(typeBytes) {
-	case "athena/[]":
-		return unmarshalSlice(valBytes)
-	case "athena/{}":
-		return unmarshalMap(valBytes)
-	default:
-		return marshallerMap[string(typeBytes)].Value(valBytes)
+	if typeBytes[0] == 0xFF {
+		switch typeBytes[1] {
+		case 0xFF:
+			return unmarshalSlice(valBytes)
+		case 0xFE:
+			return unmarshalMap(valBytes)
+		}
 	}
+
+	return marshallerMap[binary.BigEndian.Uint16(typeBytes)].Value(valBytes)
 }

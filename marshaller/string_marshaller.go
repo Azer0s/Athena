@@ -1,8 +1,6 @@
 package marshaller
 
-import (
-	"reflect"
-)
+import "reflect"
 
 func init() {
 	Register(stringMarshaller{})
@@ -19,6 +17,10 @@ func (s stringMarshaller) Bytes(i interface{}) ([]byte, error) {
 	return []byte(i.(string)), nil
 }
 
-func (s stringMarshaller) Type() reflect.Type {
+func (s stringMarshaller) Type() uint16 {
+	return TypeIdString
+}
+
+func (s stringMarshaller) ReflectType() reflect.Type {
 	return reflect.TypeOf("")
 }
